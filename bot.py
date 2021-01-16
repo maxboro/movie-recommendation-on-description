@@ -22,7 +22,7 @@ def description_tags_extraction(text: str) -> set:
     tags.update(noun_chunks)
     return tags
 
-
+'''
 class Movie:
     
     def __init__(self, line: pd.Series):
@@ -42,32 +42,43 @@ class Movie:
         intersect_len = len(self.tags.intersect(movie.tags))
         union_len = len(self.tags.union(movie.tags))
         return intersect_len / union_len
+'''
     
 class MovieCollection:
     
     def __init__(self, data: pd.DataFrame = None):
-        self.films = []
         if type(data) == pd.DataFrame and not data.empty:
-            for i in range(len(data)):
-                self.films.append(Movie(data.iloc[i]))
+            self.df = data
+        elif type(data) == pd.Series:
+            self.df = pd.DataFrame(data).T
+        else:
+            raise TypeError('Not a Dataframe')
+        self.df['tags'] = self.df['description'].apply(description_tags_extraction)
     
     def __repr__(self):
         films_to_show = []
-        for movie in self.films:
-            films_to_show.append(f'{movie.title} ({movie.year}, {",".join(movie.country)}). {movie.description}')
+        for i in range(len(self.df)):
+            line = self.df.iloc[i]
+            films_to_show.append(f'{line["title"]} ({line["year"]}, {line["country"]}). {line["description"]}')
         return '\n\n'.join(films_to_show)
     
     def __getitem__(self, key):
-        return self.films[key]
+        return MovieCollection(self.df.iloc[key])
     
-    def append(self, movie: Movie):
-        if type(movie) == Movie:
-            self.films.append(movie)
-        else:
-            raise TypeError('Append method can be used only to Movies')
-            
-    def sort(self, on: str, asc: bool):
-        pass
+    
+    def __tags_similarity_score_for_movie(self, search_tags: set, movie_tags: set) -> float:
+        intersect_len = len(movie_tags.intersection(search_tags))
+        union_len = len(movie_tags.union(search_tags))
+        return intersect_len / union_len
+    
+    def tags_similarity_score_collection(self, search_tags):
+        self.df['tag_similarity_score'] = self.df['tags'].apply(
+                self.__tags_similarity_score_for_movie, 
+                args = (search_tags,)
+                )
+         
+    def sort(self, by: str, asc: bool):
+        self.df.sort_values(by = by, axis = 0, inplace= True, ascending = asc)
 
 class Talker:
     
