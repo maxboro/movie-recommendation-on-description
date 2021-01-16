@@ -4,23 +4,25 @@ import pandas as pd
 
 nlp = spacy.load('en_core_web_sm')
 
-def description_tags_extraction(text: str) -> set:
-    doc = nlp(text)
-    tags = {
-            token.text.lower() 
-            for token in doc 
-            if (token.text.lower() not in nlp.Defaults.stop_words) 
-                and (not token.is_punct)
-                and (not token.is_digit)
-                and token.text.lower() not in {'about'}
-            }
-    noun_chunks = {
-            token.text.lower()
-            for token in doc.noun_chunks
-                if token.text.lower() not in nlp.Defaults.stop_words
-                }
-    tags.update(noun_chunks)
-    return tags
+class MixIn:
+    
+    def description_tags_extraction(self, text: str) -> set:
+        doc = nlp(text)
+        tags = {
+                token.text.lower() 
+                for token in doc 
+                if (token.text.lower() not in nlp.Defaults.stop_words) 
+                    and (not token.is_punct)
+                    and (not token.is_digit)
+                    and token.text.lower() not in {'about'}
+                    }
+        noun_chunks = {
+                token.text.lower()
+                for token in doc.noun_chunks
+                    if token.text.lower() not in nlp.Defaults.stop_words
+                    }
+        tags.update(noun_chunks)
+        return tags
 
 '''
 class Movie:
@@ -44,7 +46,7 @@ class Movie:
         return intersect_len / union_len
 '''
     
-class MovieCollection:
+class MovieCollection(MixIn):
     
     def __init__(self, data: pd.DataFrame = None):
         if type(data) == pd.DataFrame and not data.empty:
@@ -53,7 +55,7 @@ class MovieCollection:
             self.df = pd.DataFrame(data).T
         else:
             raise TypeError('Not a Dataframe')
-        self.df['tags'] = self.df['description'].apply(description_tags_extraction)
+        self.df['tags'] = self.df['description'].apply(self.description_tags_extraction)
     
     def __repr__(self):
         films_to_show = []
@@ -76,11 +78,12 @@ class MovieCollection:
                 self.__tags_similarity_score_for_movie, 
                 args = (search_tags,)
                 )
+        self.df['general_score'] = self.df['tag_similarity_score'] * self.df['avg_vote']
          
     def sort(self, by: str, asc: bool):
         self.df.sort_values(by = by, axis = 0, inplace= True, ascending = asc)
 
-class Talker:
+class Talker(MixIn):
     
     def __init__(self, movie_collection: MovieCollection):
         self.movie_collection = movie_collection
@@ -115,7 +118,7 @@ class Talker:
         if self.regime == 'favorite':
             self.tags = self.__favorite_tags_extraction(message)
         elif self.regime == 'description':
-            self.tags = description_tags_extraction(message)
+            self.tags = self.description_tags_extraction(message)
         else:
             raise ValueError('Something wrong with Talker.regime value in Talker.message_processing method')
         
