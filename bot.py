@@ -2,13 +2,16 @@ import telebot
 import spacy
 import pandas as pd
 
+testing = True
+
 nlp = spacy.load('en_core_web_sm')
 
 class MixIn:
     
     def description_tags_extraction(self, text: str) -> set:
-        doc = nlp(text)
-        tags = {
+        if type(text) == str:
+            doc = nlp(text)
+            tags = {
                 token.text.lower() 
                 for token in doc 
                 if (token.text.lower() not in nlp.Defaults.stop_words) 
@@ -16,13 +19,23 @@ class MixIn:
                     and (not token.is_digit)
                     and token.text.lower() not in {'about'}
                     }
-        noun_chunks = {
+            noun_chunks = {
                 token.text.lower()
                 for token in doc.noun_chunks
                     if token.text.lower() not in nlp.Defaults.stop_words
                     }
-        tags.update(noun_chunks)
+            tags.update(noun_chunks)
+            tags.update(self.__plural_processing(doc))
+        else:
+            tags = set()
         return tags
+    
+    def __plural_processing(self, doc: spacy.tokens.doc.Doc) -> set:
+        plural_converted = set()
+        for token in doc:
+            if token.tag_ in {'NNS', 'NNPS'}:
+                plural_converted.add(token.lemma_.lower())
+        return plural_converted
 
 '''
 class Movie:
@@ -54,7 +67,7 @@ class MovieCollection(MixIn):
         elif type(data) == pd.Series:
             self.df = pd.DataFrame(data).T
         else:
-            raise TypeError('Not a Dataframe')
+            raise TypeError('Incorrect type in MovieCollection init')
         self.df['tags'] = self.df['description'].apply(self.description_tags_extraction)
     
     def __repr__(self):
@@ -71,7 +84,10 @@ class MovieCollection(MixIn):
     def __tags_similarity_score_for_movie(self, search_tags: set, movie_tags: set) -> float:
         intersect_len = len(movie_tags.intersection(search_tags))
         union_len = len(movie_tags.union(search_tags))
-        return intersect_len / union_len
+        if union_len > 0:
+            return intersect_len / union_len
+        else:
+            return 0
     
     def tags_similarity_score_collection(self, search_tags):
         self.df['tag_similarity_score'] = self.df['tags'].apply(
@@ -98,20 +114,20 @@ class Talker(MixIn):
         bot.send_message(self.chat_id, text='How you prefer to get recommendations', reply_markup=keyboard)
     
     def favorite(self, bot):
-        print('favorite')
         bot.send_message(self.chat_id, 'Write a few of your favourite films, separated by semicolumn')
         self.regime = 'favorite'
     
     def description(self, bot):
-        print('description')
         bot.send_message(self.chat_id, 'Write film on what themes you want to watch')
         self.regime = 'description'
     
-    def subset_of_movies_based_on_tags(self, collection: MovieCollection, tags: set) -> MovieCollection:
-        pass
+    def subset_of_movies_based_on_tags(self, tags: set) -> MovieCollection:
+        self.movie_collection.tags_similarity_score_collection(tags)
+        return self.movie_collection[self.movie_collection['general_score'] > 0]
     
     def head_of_sorted_subset_of_movies(self, subset: MovieCollection, num_of_values: int) -> MovieCollection:
-        pass
+        subset.sort(by = 'general_score', asc = False)
+        return subset[:num_of_values]
         
         
     def message_processing(self, message: telebot.types.Message):
@@ -140,17 +156,22 @@ df = pd.read_csv(
                 'description':'object',
                 'avg_vote':'float64',
                 'votes':'int64'
-                })
+                }
+        )
+
+if testing:
+    df = df.head(1000)
         
-    
+print('Data is read')   
         
 full_collection = MovieCollection(df)
+print('Collection is created')
 
-bot = telebot.TeleBot('')
+bot = telebot.TeleBot('1495438867:AAFChjHlaG_rWHaY_mY_onekMRwpytHZDRw')
+talker = Talker(full_collection)
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    talker = Talker()
     talker.beginning(bot, message)
     
 @bot.message_handler(content_types=['text']) 
@@ -163,6 +184,8 @@ def callback_worker(call):
         talker.favorite(bot)
     elif call.data == "description":
         talker.description(bot)
+    else:
+        raise Exception("Button error")
     
 print('ok')
 
