@@ -37,27 +37,6 @@ class MixIn:
                 plural_converted.add(token.lemma_.lower())
         return plural_converted
 
-'''
-class Movie:
-    
-    def __init__(self, line: pd.Series):
-        parameter_dict = line.to_dict()
-        self.imdb_title_id = parameter_dict['imdb_title_id']
-        self.year = parameter_dict['year']
-        self.genre = parameter_dict['genre'].split(',')
-        self.country = parameter_dict['country'].split(',')
-        self.description = parameter_dict['description']
-        self.avg_vote = parameter_dict['avg_vote']
-        self.votes = parameter_dict['votes']
-        self.title = parameter_dict['title']
-        self.tags = description_tags_extraction(self.description)
-    
-    
-    def plot_description_similarity(self, movie: 'Movie object') -> float:
-        intersect_len = len(self.tags.intersect(movie.tags))
-        union_len = len(self.tags.union(movie.tags))
-        return intersect_len / union_len
-'''
     
 class MovieCollection(MixIn):
     
@@ -67,7 +46,7 @@ class MovieCollection(MixIn):
         elif type(data) == pd.Series:
             self.df = pd.DataFrame(data).T
         else:
-            raise TypeError('Incorrect type in MovieCollection init')
+            raise TypeError(f'Incorrect type in MovieCollection init. {type(data)}: {data}')
         self.df['tags'] = self.df['description'].apply(self.description_tags_extraction)
     
     def __repr__(self):
@@ -79,7 +58,6 @@ class MovieCollection(MixIn):
     
     def __getitem__(self, key):
         return MovieCollection(self.df.iloc[key])
-    
     
     def __tags_similarity_score_for_movie(self, search_tags: set, movie_tags: set) -> float:
         intersect_len = len(movie_tags.intersection(search_tags))
@@ -123,24 +101,35 @@ class Talker(MixIn):
     
     def subset_of_movies_based_on_tags(self, tags: set) -> MovieCollection:
         self.movie_collection.tags_similarity_score_collection(tags)
-        return self.movie_collection[self.movie_collection['general_score'] > 0]
+        if testing:
+            display(self.movie_collection.df.head(10))
+            print(f'First movie tags: {self.movie_collection.df["tags"][0]}')
+        return MovieCollection(self.movie_collection.df[self.movie_collection.df['general_score'] > 0])
     
     def head_of_sorted_subset_of_movies(self, subset: MovieCollection, num_of_values: int) -> MovieCollection:
-        subset.sort(by = 'general_score', asc = False)
-        return subset[:num_of_values]
+        if type(subset) == MovieCollection and type(num_of_values) == int:
+            subset.sort(by = 'general_score', asc = False)
+            return subset[:num_of_values]
+        else:
+            raise TypeError(f'''Wrong type in Talker.head_of_sorted_subset_of_movies method. 
+                            Subset type: {type(subset)}
+                            num_of_values type:{type(head_of_sorted_subset_of_movies)}''')
         
         
     def message_processing(self, message: telebot.types.Message):
         if self.regime == 'favorite':
             self.tags = self.__favorite_tags_extraction(message)
         elif self.regime == 'description':
-            self.tags = self.description_tags_extraction(message)
+            self.tags = self.description_tags_extraction(message.text)
         else:
-            raise ValueError('Something wrong with Talker.regime value in Talker.message_processing method')
+            raise ValueError(f'Something wrong with Talker.regime value in Talker.message_processing method. Value: {regime}')
         
+        if testing:
+            print(f'Search tags: {self.tags}')
         subset = self.subset_of_movies_based_on_tags(self.tags)
         head_of_subset = self.head_of_sorted_subset_of_movies(subset, 5)
         bot.send_message(self.chat_id, head_of_subset)
+        
         
         
         
@@ -161,13 +150,14 @@ df = pd.read_csv(
 
 if testing:
     df = df.head(1000)
+    pd.set_option('display.max_columns', 30)
         
 print('Data is read')   
         
 full_collection = MovieCollection(df)
 print('Collection is created')
 
-bot = telebot.TeleBot('')
+bot = telebot.TeleBot('')  #token
 talker = Talker(full_collection)
 
 @bot.message_handler(commands=['start'])
