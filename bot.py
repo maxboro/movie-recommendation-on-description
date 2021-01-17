@@ -167,7 +167,7 @@ print('Data is read')
 full_collection = MovieCollection(df)
 print('Collection is created')
 
-bot = telebot.TeleBot('1495438867:AAFChjHlaG_rWHaY_mY_onekMRwpytHZDRw')
+bot = telebot.TeleBot('')
 talker = Talker(full_collection)
 
 @bot.message_handler(commands=['start'])
