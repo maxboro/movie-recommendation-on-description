@@ -1,5 +1,6 @@
 import telebot
 import spacy
+import numpy as np
 import pandas as pd
 
 testing = True
@@ -17,7 +18,7 @@ class MixIn:
                 if (token.text.lower() not in nlp.Defaults.stop_words) 
                     and (not token.is_punct)
                     and (not token.is_digit)
-                    and token.text.lower() not in {'about'}
+                    and token.text.lower() not in {'smth'}
                     }
             noun_chunks = {
                 token.text.lower()
@@ -72,7 +73,7 @@ class MovieCollection(MixIn):
                 self.__tags_similarity_score_for_movie, 
                 args = (search_tags,)
                 )
-        self.df['general_score'] = self.df['tag_similarity_score'] * self.df['avg_vote']
+        self.df['general_score'] = np.sqrt(self.df['tag_similarity_score']) * self.df['avg_vote']*0.1
          
     def sort(self, by: str, asc: bool):
         self.df.sort_values(by = by, axis = 0, inplace= True, ascending = asc)
