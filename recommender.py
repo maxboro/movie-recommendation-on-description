@@ -3,17 +3,19 @@ import spacy
 import numpy as np
 import pandas as pd
 
-nlp = spacy.load('en_core_web_sm')
+
 
 class MixIn:
     
+    nlp = spacy.load('en_core_web_sm')
+    
     def description_tags_extraction(self, text: str) -> set:
         if type(text) == str:
-            doc = nlp(text)
+            doc = self.nlp(text)
             tags = {
                 token.text.lower() 
                 for token in doc 
-                if (token.text.lower() not in nlp.Defaults.stop_words) 
+                if (token.text.lower() not in self.nlp.Defaults.stop_words) 
                     and (not token.is_punct)
                     and (not token.is_digit)
                     and token.text.lower() not in {'smth'}
@@ -21,7 +23,7 @@ class MixIn:
             noun_chunks = {
                 token.text.lower()
                 for token in doc.noun_chunks
-                    if token.text.lower() not in nlp.Defaults.stop_words
+                    if token.text.lower() not in self.nlp.Defaults.stop_words
                     }
             tags.update(noun_chunks)
             tags.update(self.__plural_processing(doc))
