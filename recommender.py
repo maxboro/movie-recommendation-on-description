@@ -54,7 +54,8 @@ class MovieCollection(MixIn):
         films_to_show = []
         for i in range(len(self.df)):
             line = self.df.iloc[i]
-            films_to_show.append(f'{line["title"]} ({line["year"]}, {line["country"]}). {line["description"]}')
+            films_to_show.append(f'{line["original_title"]} ({line["year"]}, {line["country"]}). ' +
+                                      f'{line["description"]} Vote - {line["avg_vote"]}')
         return '\n\n'.join(films_to_show)
     
     def __getitem__(self, key):
@@ -62,9 +63,9 @@ class MovieCollection(MixIn):
     
     def __tags_similarity_score_for_movie(self, search_tags: set, movie_tags: set) -> float:
         intersect_len = len(movie_tags.intersection(search_tags))
-        union_len = len(movie_tags.union(search_tags))
-        if union_len > 0:
-            return intersect_len / union_len
+        search_len = len(search_tags)
+        if search_len > 0:
+            return intersect_len / search_len
         else:
             return 0
     
