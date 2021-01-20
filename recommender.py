@@ -130,13 +130,10 @@ class Talker(MixIn):
         
         if self.testing: print(f'Search tags: {self.tags}')
         subset = self.subset_of_movies_based_on_tags(self.tags)
-        if self.testing: print(f'subset len {len(subset)}')
         
         if subset:
             head_of_subset = self.head_of_sorted_subset_of_movies(subset, 5)
-            if self.testing: print(f'head_of_subset len {len(head_of_subset)}')
-            if self.testing: print(head_of_subset)
-            bot.send_message(self.chat_id, head_of_subset)
+            bot.send_message(self.chat_id, str(head_of_subset))
         else:
             bot.send_message(self.chat_id, "No such movies in base")
              
