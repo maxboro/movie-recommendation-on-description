@@ -1,3 +1,4 @@
+import time
 from recommender import * 
 
 testing = True
@@ -36,7 +37,9 @@ def start_message(message):
     
 @bot.message_handler(content_types=['text']) 
 def get_text_messages(message):
+    start = time.time()
     talker.message_processing(bot, message)
+    bot.send_message(talker.chat_id, f'search time: {round(time.time() - start, 1)} s')
     
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):

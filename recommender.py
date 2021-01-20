@@ -13,7 +13,7 @@ class MixIn:
         if type(text) == str:
             doc = self.nlp(text)
             tags = {
-                token.text.lower() 
+                token.lemma_ 
                 for token in doc 
                 if (token.text.lower() not in self.nlp.Defaults.stop_words) 
                     and (not token.is_punct)
@@ -26,17 +26,11 @@ class MixIn:
                     if token.text.lower() not in self.nlp.Defaults.stop_words
                     }
             tags.update(noun_chunks)
-            tags.update(self.__plural_processing(doc))
         else:
             tags = set()
         return tags
     
-    def __plural_processing(self, doc: spacy.tokens.doc.Doc) -> set:
-        plural_converted = set()
-        for token in doc:
-            if token.tag_ in {'NNS', 'NNPS'}:
-                plural_converted.add(token.lemma_.lower())
-        return plural_converted
+  
 
     
 class MovieCollection(MixIn):
@@ -60,6 +54,9 @@ class MovieCollection(MixIn):
     
     def __getitem__(self, key):
         return MovieCollection(self.df.iloc[key])
+    
+    def __len__(self):
+        return len(self.df)
     
     def __tags_similarity_score_for_movie(self, search_tags: set, movie_tags: set) -> float:
         intersect_len = len(movie_tags.intersection(search_tags))
@@ -131,12 +128,14 @@ class Talker(MixIn):
         else:
             raise ValueError(f'Something wrong with Talker.regime value in Talker.message_processing method. Value: {regime}')
         
-        if self.testing:
-            print(f'Search tags: {self.tags}')
+        if self.testing: print(f'Search tags: {self.tags}')
         subset = self.subset_of_movies_based_on_tags(self.tags)
+        if self.testing: print(f'subset len {len(subset)}')
         
         if subset:
             head_of_subset = self.head_of_sorted_subset_of_movies(subset, 5)
+            if self.testing: print(f'head_of_subset len {len(head_of_subset)}')
+            if self.testing: print(head_of_subset)
             bot.send_message(self.chat_id, head_of_subset)
         else:
             bot.send_message(self.chat_id, "No such movies in base")

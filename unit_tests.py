@@ -19,14 +19,49 @@ class Tests(unittest.TestCase):
                         'votes':'int64'
                         }
                     ).head(5)
+        self.collection_test = MovieCollection(self.df_test)
+        self.talker = Talker(movie_collection = self.collection_test, testing = False)
+
     
-    def test_description_tags_extraction(self):
-        self.assertIn('cat', MixIn().description_tags_extraction('cats dogs reporters'))
-        self.assertIn('reporter', MixIn().description_tags_extraction('cats dogs reporters'))
+    def test_mixin_description_tags_extraction(self):
+        self.assertIn('cat', MixIn().description_tags_extraction('cats 08 reporters  '))
+        self.assertIn('reporter', MixIn().description_tags_extraction('cats 64 reporters'))
         self.assertIn('woman', MixIn().description_tags_extraction('women'))
         self.assertNotIn('.', MixIn().description_tags_extraction('cats .dogs, reporters'))
         self.assertNotIn(',', MixIn().description_tags_extraction('cats .dogs, reporters'))
     
-
+    
+    def test_mc_len__testing(self):
+        self.assertEqual(len(self.collection_test), 5)
+        self.assertEqual(len(self.collection_test), len(self.df_test))
+    
+    def test_mc_getitem_testing(self):
+        self.assertEqual(len(self.collection_test) - 1, len(self.collection_test[1:]))
+        
+    def test_mc_tags_similarity_score_for_movie(self):
+        self.assertEqual(self.collection_test._MovieCollection__tags_similarity_score_for_movie(
+                search_tags = {'dog', 'cat', 'd', 'v'}, 
+                movie_tags = {'dog', 'cat'}
+                ), 0.5
+            )
+        
+        self.assertEqual(self.collection_test._MovieCollection__tags_similarity_score_for_movie(
+                search_tags = {'dog', 'cat'}, 
+                movie_tags = {'dog', 'cat', 'd', 'v'}
+                ), 1
+            )
+            
+        self.assertEqual(self.collection_test._MovieCollection__tags_similarity_score_for_movie(
+                search_tags = {}, 
+                movie_tags = {'dog', 'cat', 'd', 'v'}
+                ), 0
+            )
+    
+    def test_talker_subset_of_movies_based_on_tags(self):
+        self.assertEqual(self.talker.subset_of_movies_based_on_tags(tags = set()), None)
+        self.assertEqual(len(self.talker.subset_of_movies_based_on_tags(tags = {'reporter'})), 1)
+        self.assertEqual(len(self.talker.subset_of_movies_based_on_tags(tags = {'true story'})), 1)
+    
+    
 unittest.main()
 
