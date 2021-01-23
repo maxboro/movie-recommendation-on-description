@@ -29,24 +29,24 @@ print('Data is read')
 full_collection = MovieCollection(df)
 print('Collection is created')
     
-talker = Talker(movie_collection = full_collection, testing = testing)
+talker = Talker(movie_collection = full_collection, testing = testing, telebot = bot)
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    talker.beginning(bot, message)
+    talker.beginning(message)
     
 @bot.message_handler(content_types=['text']) 
 def get_text_messages(message):
     start = time.time()
-    talker.message_processing(bot, message)
-    bot.send_message(talker.chat_id, f'search time: {round(time.time() - start, 1)} s')
+    talker.message_processing(message)
+    talker.send_message(f'search time: {round(time.time() - start, 1)} s')
     
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
     if call.data == "favorite":
-        talker.favorite(bot)
+        talker.favorite()
     elif call.data == "description":
-        talker.description(bot)
+        talker.description()
     else:
         raise Exception("Button error")
     
