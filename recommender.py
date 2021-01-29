@@ -40,7 +40,7 @@ class MixIn:
     
 class MovieCollection(MixIn):
     
-    def __init__(self, data: pd.DataFrame = None):
+    def __init__(self, data: pd.DataFrame = None) -> None:
         if type(data) == pd.DataFrame:
             self.df = data
         elif type(data) == pd.Series:
@@ -50,7 +50,7 @@ class MovieCollection(MixIn):
         self.df['tags'] = self.df['description'].apply(self.description_tags_extraction)
         self.df['title_lower'] = self.df['original_title'].apply(self.movie_title_processing)
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         films_to_show = []
         for i in range(len(self.df)):
             line = self.df.iloc[i]
@@ -61,7 +61,7 @@ class MovieCollection(MixIn):
     def __getitem__(self, key):
         return MovieCollection(self.df.iloc[key])
     
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.df)
     
     def __tags_similarity_score_for_movie(self, search_tags: set, movie_tags: set) -> float:
@@ -72,6 +72,14 @@ class MovieCollection(MixIn):
         else:
             return 0
     
+    def get_id(self) -> (list, str):
+        if len(self) > 1:
+            return self.df['imdb_title_id'].to_list()
+        elif len(self) == 1:
+            return self.df['imdb_title_id'].values[0]
+        else:
+            return None
+        
     def get_tags(self) -> set:
         tags = set()
         for line_tags in self.df['tags']:
@@ -81,6 +89,9 @@ class MovieCollection(MixIn):
     def search_by_title(self, title: str):
         title_clean = self.movie_title_processing(title)
         return MovieCollection(self.df[self.df['title_lower'] == title_clean])
+    
+    def search_by_id(self, movie_id: str):
+        return MovieCollection(self.df[self.df['imdb_title_id'] == movie_id])
     
     def search_by_title_except(self, titles: set):
         titles_clean = {self.movie_title_processing(title) for title in titles}
@@ -98,30 +109,35 @@ class MovieCollection(MixIn):
 
 class Talker(MixIn):
     
-    def __init__(self, movie_collection: MovieCollection, testing: bool, telebot: telebot.TeleBot):
+    def __init__(self, movie_collection: MovieCollection, testing: bool, telebot: telebot.TeleBot) -> None:
         self.movie_collection = movie_collection
         self.testing = testing
         self.telebot = telebot
+        self.clarification_regime = False
     
-    def beginning(self, message: telebot.types.Message):
+    def beginning(self, message: telebot.types.Message) -> None:
         self.chat_id = message.from_user.id
         keyboard = telebot.types.InlineKeyboardMarkup()  
-        key_user_desc = telebot.types.InlineKeyboardButton(text='Recommend movies from description', callback_data='description') 
+        key_user_desc = telebot.types.InlineKeyboardButton(text='Recommend movies from description', 
+                                                           callback_data='description') 
         keyboard.add(key_user_desc)
-        key_user_fav = telebot.types.InlineKeyboardButton(text='Recommend movies like your favorite movies', callback_data='favorite') 
+        key_user_fav = telebot.types.InlineKeyboardButton(text='Recommend movies like your favorite movies', 
+                                                          callback_data='favorite') 
         keyboard.add(key_user_fav)
-        self.telebot.send_message(self.chat_id, text='How you prefer to get recommendations', reply_markup=keyboard)
+        self.telebot.send_message(self.chat_id, text='How you prefer to get recommendations', 
+                                  reply_markup=keyboard)
     
-    def favorite(self):
+    def favorite(self) -> None:
         self.send_message('Write a few of your favourite films, separated by semicolumn')
         self.regime = 'favorite'
     
-    def description(self):
+    def description(self) -> None:
         self.send_message('Write film on what themes you want to watch')
         self.regime = 'description'
     
-    def send_message(self, message_text: str):
-        self.telebot.send_message(self.chat_id, text=message_text)
+    def send_message(self, *messages: str) -> None:
+        for msg in messages:
+            self.telebot.send_message(self.chat_id, text=msg)
     
     def __subset_of_movies_based_on_tags(self, tags: set) -> MovieCollection:
         self.movie_collection.tags_similarity_score_collection(tags)
@@ -151,20 +167,47 @@ class Talker(MixIn):
             if len(movies_with_this_title) == 1:
                 search_tags.update(movies_with_this_title.get_tags())
             elif len(movies_with_this_title) > 1:
-                self.send_message(f"Multiple movies named '{name}' in base: \n {set(movies_with_this_title)}")
+                self.send_message(f"Multiple movies named '{name}' in base: \n {set(movies_with_this_title)}",
+                                  "Please choose what movie exactly you are talking about")
+                self.clarification_regime = True
+                self.clarification_set = movies_with_this_title
             else:
                 self.send_message(f"No movies named '{name}' in base")
             
         return search_tags
+    
+    def tags_injection(self, movie_id: str) -> None:
+        movie = self.clarification_set.search_by_id(movie_id)
+        self.tags.update(movie.get_tags())
+    
+    def multiple_films_with_one_name_handler(self):
+        if self.films_with_one_name_unsolved == 0:
+            answer()
+        else:
+            pass
+            
         
-    def message_processing(self, message: telebot.types.Message):
+    def message_processing(self, message: telebot.types.Message) -> None:
         if self.regime == 'favorite':
             self.tags = self.__favorite_tags_extraction(message.text)
+            if self.clarification_regime:
+                keyboard_mov = telebot.types.InlineKeyboardMarkup()
+                for movie in self.clarification_set: 
+                    
+                    keyboard_mov.add(telebot.types.InlineKeyboardButton(text=f'{str(movie)}', 
+                                                                        callback_data=f'{movie.get_id()}'))
+                self.telebot.send_message(self.chat_id, text="Variants", 
+                                          reply_markup=keyboard_mov)
+            else:
+                self.answer()
         elif self.regime == 'description':
             self.tags = self.description_tags_extraction(message.text)
+            self.answer()
         else:
             raise ValueError(f'Something wrong with Talker.regime value in Talker.message_processing method. Value: {regime}')
         
+    
+    def answer(self):
         if self.testing: print(f'Search tags: {self.tags}')
         subset = self.__subset_of_movies_based_on_tags(self.tags)
         

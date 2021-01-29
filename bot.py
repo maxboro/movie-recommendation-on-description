@@ -43,12 +43,16 @@ def get_text_messages(message):
     
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
-    if call.data == "favorite":
-        talker.favorite()
-    elif call.data == "description":
-        talker.description()
+    if talker.clarification_refime:
+        talker.tags_injection(movie_id = call.data)
+        talker.answer()
     else:
-        raise Exception("Button error")
+        if call.data == "favorite":
+            talker.favorite()
+        elif call.data == "description":
+            talker.description()
+        else:
+            raise Exception("Button error")
     
 print('ok')
 
