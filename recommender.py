@@ -59,7 +59,13 @@ class MovieCollection(MixIn):
         return '\n\n'.join(films_to_show)
     
     def __getitem__(self, key):
-        return MovieCollection(self.df.iloc[key])
+        if type(key) == str:
+            if len(self.df) == 1:
+                return self.df[key].values[0]
+            else:
+                return self.df[key]
+        else:    
+            return MovieCollection(self.df.iloc[key])
     
     def __len__(self) -> int:
         return len(self.df)
@@ -114,6 +120,7 @@ class Talker(MixIn):
         self.testing = testing
         self.telebot = telebot
         self.clarification_regime = False
+        self.clarification_set = []
     
     def beginning(self, message: telebot.types.Message) -> None:
         self.chat_id = message.from_user.id
@@ -167,39 +174,40 @@ class Talker(MixIn):
             if len(movies_with_this_title) == 1:
                 search_tags.update(movies_with_this_title.get_tags())
             elif len(movies_with_this_title) > 1:
-                self.send_message(f"Multiple movies named '{name}' in base: \n {set(movies_with_this_title)}",
-                                  "Please choose what movie exactly you are talking about")
                 self.clarification_regime = True
-                self.clarification_set = movies_with_this_title
+                self.clarification_set.append(movies_with_this_title)
             else:
                 self.send_message(f"No movies named '{name}' in base")
             
         return search_tags
     
     def tags_injection(self, movie_id: str) -> None:
-        movie = self.clarification_set.search_by_id(movie_id)
+        movie = self.movie_collection.search_by_id(movie_id)
         self.tags.update(movie.get_tags())
-    
+        
     def multiple_films_with_one_name_handler(self):
-        if self.films_with_one_name_unsolved == 0:
-            answer()
+        keyboard_mov = telebot.types.InlineKeyboardMarkup()
+        for movie in self.clarification_set[0]:
+            keyboard_mov.add(telebot.types.InlineKeyboardButton(text=f'{str(movie)}', 
+                                                    callback_data=f'{movie["imdb_title_id"]}'))
+        self.clarification_set.pop(0)
+        self.send_message(f"Multiple movies named '{movie['original_title']}' are in base",
+                                  "Please choose what movie exactly you are talking about")
+        self.telebot.send_message(self.chat_id, text="Variants:", 
+                                          reply_markup=keyboard_mov)
+    
+    def multiple_films_with_one_name_check(self):
+        if not self.clarification_set:
+            self.clarification_regime = False
+            self.answer()
         else:
-            pass
+            self.multiple_films_with_one_name_handler()
             
         
     def message_processing(self, message: telebot.types.Message) -> None:
         if self.regime == 'favorite':
             self.tags = self.__favorite_tags_extraction(message.text)
-            if self.clarification_regime:
-                keyboard_mov = telebot.types.InlineKeyboardMarkup()
-                for movie in self.clarification_set: 
-                    
-                    keyboard_mov.add(telebot.types.InlineKeyboardButton(text=f'{str(movie)}', 
-                                                                        callback_data=f'{movie.get_id()}'))
-                self.telebot.send_message(self.chat_id, text="Variants", 
-                                          reply_markup=keyboard_mov)
-            else:
-                self.answer()
+            self.multiple_films_with_one_name_check()
         elif self.regime == 'description':
             self.tags = self.description_tags_extraction(message.text)
             self.answer()

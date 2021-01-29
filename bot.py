@@ -43,9 +43,9 @@ def get_text_messages(message):
     
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
-    if talker.clarification_refime:
+    if talker.clarification_regime:
         talker.tags_injection(movie_id = call.data)
-        talker.answer()
+        talker.multiple_films_with_one_name_check()
     else:
         if call.data == "favorite":
             talker.favorite()
