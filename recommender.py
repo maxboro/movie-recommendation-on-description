@@ -78,8 +78,8 @@ class MovieCollection(MixIn):
         else:
             return 0
     
-    def get_id(self) -> (list, str):
-        if len(self) > 1:
+    def get_id(self, return_list: bool = False) -> (list, str):
+        if len(self) > 1 or return_list:
             return self.df['imdb_title_id'].to_list()
         elif len(self) == 1:
             return self.df['imdb_title_id'].values[0]
@@ -99,9 +99,17 @@ class MovieCollection(MixIn):
     def search_by_id(self, movie_id: str):
         return MovieCollection(self.df[self.df['imdb_title_id'] == movie_id])
     
-    def search_by_title_except(self, titles: set):
-        titles_clean = {self.movie_title_processing(title) for title in titles}
-        return MovieCollection(self.df[self.df['title_lower'] not in titles_clean])
+    def removed_by_id(self, movie_id: (str, list)):
+        if type(movie_id) == list:
+            if movie_id:
+                return MovieCollection(self.df[~self.df['imdb_title_id'].isin(movie_id)])
+            else:
+                return self
+        elif type(movie_id) == str:
+            return MovieCollection(self.df[self.df['imdb_title_id'] != movie_id])
+        else:
+            raise TypeError(f'Movie id only str or list, got {type(movie_id)}')
+    
     
     def tags_similarity_score_collection(self, search_tags):
         self.df['tag_similarity_score'] = self.df['tags'].apply(
@@ -137,6 +145,7 @@ class Talker(MixIn):
     def favorite(self) -> None:
         self.send_message('Write a few of your favourite films, separated by semicolumn')
         self.regime = 'favorite'
+        self.search_id_set = []
     
     def description(self) -> None:
         self.send_message('Write film on what themes you want to watch')
@@ -173,6 +182,7 @@ class Talker(MixIn):
             movies_with_this_title = self.movie_collection.search_by_title(name)
             if len(movies_with_this_title) == 1:
                 search_tags.update(movies_with_this_title.get_tags())
+                self.search_id_set.extend(movies_with_this_title.get_id())
             elif len(movies_with_this_title) > 1:
                 self.clarification_regime = True
                 self.clarification_set.append(movies_with_this_title)
@@ -184,6 +194,7 @@ class Talker(MixIn):
     def tags_injection(self, movie_id: str) -> None:
         movie = self.movie_collection.search_by_id(movie_id)
         self.tags.update(movie.get_tags())
+        self.search_id_set.extend(movie.get_id(return_list = True))
         
     def multiple_films_with_one_name_handler(self):
         keyboard_mov = telebot.types.InlineKeyboardMarkup()
@@ -218,7 +229,9 @@ class Talker(MixIn):
     def answer(self):
         if self.testing: print(f'Search tags: {self.tags}')
         subset = self.__subset_of_movies_based_on_tags(self.tags)
-        
+        subset = subset.removed_by_id(self.search_id_set)
+        if self.testing: print('search_id_set:', self.search_id_set)
+        self.search_id_set.clear()
         if subset:
             head_of_subset = self.__head_of_sorted_subset_of_movies(subset, 5)
             self.send_message(str(head_of_subset))
