@@ -182,7 +182,7 @@ class Talker(MixIn):
             movies_with_this_title = self.movie_collection.search_by_title(name)
             if len(movies_with_this_title) == 1:
                 search_tags.update(movies_with_this_title.get_tags())
-                self.search_id_set.extend(movies_with_this_title.get_id())
+                self.search_id_set.extend(movies_with_this_title.get_id(return_list = True))
             elif len(movies_with_this_title) > 1:
                 self.clarification_regime = True
                 self.clarification_set.append(movies_with_this_title)
@@ -231,10 +231,8 @@ class Talker(MixIn):
         subset = self.__subset_of_movies_based_on_tags(self.tags)
         if self.regime == 'favorite':
             subset = subset.removed_by_id(self.search_id_set)
+            if self.testing:print('search_id_set:', self.search_id_set)
             self.search_id_set.clear()
-            
-        if self.testing and self.regime == 'favorite': 
-            print('search_id_set:', self.search_id_set)
         
         if subset:
             head_of_subset = self.__head_of_sorted_subset_of_movies(subset, 5)

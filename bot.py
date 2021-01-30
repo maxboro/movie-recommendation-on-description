@@ -1,7 +1,7 @@
 import time
 from recommender import * 
 
-testing = True
+testing = False
 
 bot = telebot.TeleBot('')  #token 
 
@@ -31,8 +31,8 @@ else:
             return 0
         
     df['year'] = df['year'].apply(to_int)
-    df = df[(df['votes'] > 1000) & (df['year'] > 1935)]
-    df = df.sort_values(by=['avg_vote'], ascending=False).head(1500)
+    df = df[(df['votes'] > 1400) & (df['year'] > 1935)]
+    df = df.sort_values(by=['avg_vote'], ascending=False).head(12000)
         
 print('Data is read')   
         
