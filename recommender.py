@@ -116,7 +116,7 @@ class MovieCollection(MixIn):
                 self.__tags_similarity_score_for_movie, 
                 args = (search_tags,)
                 )
-        self.df['general_score'] = np.sqrt(self.df['tag_similarity_score']) * self.df['avg_vote']*0.1
+        self.df['general_score'] = self.df['tag_similarity_score'] * self.df['avg_vote']*0.01
          
     def sort(self, by: str, asc: bool):
         self.df.sort_values(by = by, axis = 0, inplace= True, ascending = asc)
@@ -148,7 +148,7 @@ class Talker(MixIn):
         self.search_id_set = []
     
     def description(self) -> None:
-        self.send_message('Write film on what themes you want to watch')
+        self.send_message('Write film themes you are interested in')
         self.regime = 'description'
     
     def send_message(self, *messages: str) -> None:
@@ -187,7 +187,7 @@ class Talker(MixIn):
                 self.clarification_regime = True
                 self.clarification_set.append(movies_with_this_title)
             else:
-                self.send_message(f"No movies named '{name}' in base")
+                self.send_message(f"No movies named '{name.strip()}' in base")
             
         return search_tags
     
@@ -229,9 +229,13 @@ class Talker(MixIn):
     def answer(self):
         if self.testing: print(f'Search tags: {self.tags}')
         subset = self.__subset_of_movies_based_on_tags(self.tags)
-        subset = subset.removed_by_id(self.search_id_set)
-        if self.testing: print('search_id_set:', self.search_id_set)
-        self.search_id_set.clear()
+        if self.regime == 'favorite':
+            subset = subset.removed_by_id(self.search_id_set)
+            self.search_id_set.clear()
+            
+        if self.testing and self.regime == 'favorite': 
+            print('search_id_set:', self.search_id_set)
+        
         if subset:
             head_of_subset = self.__head_of_sorted_subset_of_movies(subset, 5)
             self.send_message(str(head_of_subset))

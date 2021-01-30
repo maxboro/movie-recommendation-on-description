@@ -23,6 +23,16 @@ df = pd.read_csv(
 if testing:
     df = df.head(1000)
     pd.set_option('display.max_columns', 30)
+else:
+    def to_int(x):
+        try:
+            return int(x)
+        except:
+            return 0
+        
+    df['year'] = df['year'].apply(to_int)
+    df = df[(df['votes'] > 1000) & (df['year'] > 1935)]
+    df = df.sort_values(by=['avg_vote'], ascending=False).head(1500)
         
 print('Data is read')   
         
