@@ -1,7 +1,7 @@
 import time
 from recommender import * 
 
-testing = False
+testing = True
 
 bot = telebot.TeleBot('')  #token 
 
@@ -24,12 +24,7 @@ if testing:
     df = df.head(1000)
     pd.set_option('display.max_columns', 30)
 else:
-    def to_int(x):
-        try:
-            return int(x)
-        except:
-            return 0
-        
+    to_int = lambda x: int(x) if x.isnumeric() else 0   
     df['year'] = df['year'].apply(to_int)
     df = df[(df['votes'] > 1400) & (df['year'] > 1935)]
     df = df.sort_values(by=['avg_vote'], ascending=False).head(12000)
@@ -38,35 +33,38 @@ print('Data is read')
         
 full_collection = MovieCollection(df)
 print('Collection is created')
-    
-talker = Talker(movie_collection = full_collection, testing = testing, telebot = bot)
+regime_manager = RegimeManager(bot)
+
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    talker.beginning(message)
-    
-@bot.message_handler(content_types=['text']) 
-def get_text_messages(message):
-    start = time.time()
-    talker.message_processing(message)
-    talker.send_message(f'search time: {round(time.time() - start, 1)} s')
+    regime_manager.beginning(message)
     
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
-    if talker.clarification_regime:
-        talker.tags_injection(movie_id = call.data)
-        talker.multiple_films_with_one_name_check()
+    if call.data in {'favorite', 'description'}:
+        global talker
+        talker = regime_manager.returnBot(
+                call = call, 
+                movie_collection = full_collection, 
+                testing = testing, 
+                telebot = bot
+                )
     else:
-        if call.data == "favorite":
-            talker.favorite()
-        elif call.data == "description":
-            talker.description()
-        else:
-            raise Exception("Button error")
+        talker.add_tags_in_multiple_movies_with_same_name_situation(movie_id = call.data)
+
+@bot.message_handler(content_types=['text']) 
+def get_text_messages(message):
+    start = time.time()
+    print(type(talker))
+    talker.message_processing(message)
+    print(type(talker))
+    talker.send_message(f'search time: {round(time.time() - start, 1)} s')
+    
     
 print('ok')
 
-bot.polling(none_stop=True, interval=0)
+#bot.infinity_polling()
         
-
+bot.polling(none_stop=True, interval=0)
     

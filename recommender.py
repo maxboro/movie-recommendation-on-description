@@ -6,7 +6,7 @@ import pandas as pd
 
 
 
-class MixIn:
+class TextProcessor:
     
     nlp = spacy.load('en_core_web_sm')
     
@@ -38,7 +38,7 @@ class MixIn:
   
 
     
-class MovieCollection(MixIn):
+class MovieCollection(TextProcessor):
     
     def __init__(self, data: pd.DataFrame = None) -> None:
         if type(data) == pd.DataFrame:
@@ -120,46 +120,17 @@ class MovieCollection(MixIn):
          
     def sort(self, by: str, asc: bool):
         self.df.sort_values(by = by, axis = 0, inplace= True, ascending = asc)
+  
 
-class Talker(MixIn):
-    
-    def __init__(self, movie_collection: MovieCollection, testing: bool, telebot: telebot.TeleBot) -> None:
-        self.movie_collection = movie_collection
-        self.testing = testing
-        self.telebot = telebot
-        self.clarification_regime = False
-        self.clarification_set = []
-    
-    def beginning(self, message: telebot.types.Message) -> None:
-        self.chat_id = message.from_user.id
-        keyboard = telebot.types.InlineKeyboardMarkup()  
-        key_user_desc = telebot.types.InlineKeyboardButton(text='Recommend movies from description', 
-                                                           callback_data='description') 
-        keyboard.add(key_user_desc)
-        key_user_fav = telebot.types.InlineKeyboardButton(text='Recommend movies like your favorite movies', 
-                                                          callback_data='favorite') 
-        keyboard.add(key_user_fav)
-        self.telebot.send_message(self.chat_id, text='How you prefer to get recommendations', 
-                                  reply_markup=keyboard)
-    
-    def favorite(self) -> None:
-        self.send_message('Write a few of your favourite films, separated by semicolumn')
-        self.regime = 'favorite'
-        self.search_id_set = []
-    
-    def description(self) -> None:
-        self.send_message('Write film themes you are interested in')
-        self.regime = 'description'
-    
+class Talker(TextProcessor):
+ 
     def send_message(self, *messages: str) -> None:
         for msg in messages:
             self.telebot.send_message(self.chat_id, text=msg)
     
-    def __subset_of_movies_based_on_tags(self, tags: set) -> MovieCollection:
+    def subset_of_movies_based_on_tags(self, tags: set) -> MovieCollection:
         self.movie_collection.tags_similarity_score_collection(tags)
-        if self.testing:
-            display(self.movie_collection.df.head(10))
-            print(f'First movie tags: {self.movie_collection.df["tags"][0]}')
+        if self.testing: display(self.movie_collection.df.head(10))
         query_result = self.movie_collection.df[self.movie_collection.df['general_score'] > 0]
         if not query_result.empty:
             return MovieCollection(query_result)
@@ -173,8 +144,55 @@ class Talker(MixIn):
         else:
             raise TypeError(f'''Wrong type in Talker.head_of_sorted_subset_of_movies method. 
                             Subset type: {type(subset)}
-                            num_of_values type:{type(head_of_sorted_subset_of_movies)}''')
-     
+                            num_of_values type:{type(num_of_values)}''')
+    
+    def print_answer(self, subset):
+        if subset:
+            head_of_subset = self.__head_of_sorted_subset_of_movies(subset, 5)
+            self.send_message(str(head_of_subset))
+        else:
+            self.send_message("No such movies in base")
+
+
+class RegimeManager(Talker):
+    
+    def __init__(self, telebot: telebot.TeleBot) -> None:
+        self.telebot = telebot
+    
+    def beginning(self, message: telebot.types.Message) -> None:
+        self.chat_id = message.from_user.id
+        keyboard = telebot.types.InlineKeyboardMarkup()  
+        key_user_desc = telebot.types.InlineKeyboardButton(text='Recommend movies from description', 
+                                                           callback_data='description') 
+        keyboard.add(key_user_desc)
+        key_user_fav = telebot.types.InlineKeyboardButton(text='Recommend movies like your favorite movies', 
+                                                          callback_data='favorite') 
+        keyboard.add(key_user_fav)
+        self.telebot.send_message(self.chat_id, text='How you prefer to get recommendations', 
+                                  reply_markup=keyboard)
+        
+    def returnBot(self, call, movie_collection, testing, telebot) -> None:
+        if call.data == "favorite":
+            self.send_message('Write a few of your favourite films, separated by semicolumn')
+            return FavoriteRegime(movie_collection, testing, telebot, self.chat_id)
+        elif call.data == "description":
+            self.send_message('Write film themes you are interested in')
+            return DescriptionRegime(movie_collection, testing, telebot, self.chat_id)
+        else:
+            raise Exception("Button error")
+            
+
+class FavoriteRegime(Talker):
+    
+    def __init__(self, movie_collection: MovieCollection, testing: bool, telebot: telebot.TeleBot, chat_id) -> None:
+        self.movie_collection = movie_collection
+        self.testing = testing
+        self.telebot = telebot
+        self.chat_id = chat_id
+        self.clarification_set = []
+        self.search_id_set = []
+    
+    
     def __favorite_tags_extraction(self, movie_names: str) -> set:
         search_tags = set()
         names = {name for name in movie_names.split(';')}
@@ -184,19 +202,14 @@ class Talker(MixIn):
                 search_tags.update(movies_with_this_title.get_tags())
                 self.search_id_set.extend(movies_with_this_title.get_id(return_list = True))
             elif len(movies_with_this_title) > 1:
-                self.clarification_regime = True
                 self.clarification_set.append(movies_with_this_title)
             else:
                 self.send_message(f"No movies named '{name.strip()}' in base")
             
         return search_tags
+         
     
-    def tags_injection(self, movie_id: str) -> None:
-        movie = self.movie_collection.search_by_id(movie_id)
-        self.tags.update(movie.get_tags())
-        self.search_id_set.extend(movie.get_id(return_list = True))
-        
-    def multiple_films_with_one_name_handler(self):
+    def __multiple_films_with_one_name_handler(self):
         keyboard_mov = telebot.types.InlineKeyboardMarkup()
         for movie in self.clarification_set[0]:
             keyboard_mov.add(telebot.types.InlineKeyboardButton(text=f'{str(movie)}', 
@@ -207,37 +220,52 @@ class Talker(MixIn):
         self.telebot.send_message(self.chat_id, text="Variants:", 
                                           reply_markup=keyboard_mov)
     
-    def multiple_films_with_one_name_check(self):
+    def __multiple_films_with_one_name_check(self):
         if not self.clarification_set:
-            self.clarification_regime = False
             self.answer()
         else:
-            self.multiple_films_with_one_name_handler()
-            
-        
-    def message_processing(self, message: telebot.types.Message) -> None:
-        if self.regime == 'favorite':
-            self.tags = self.__favorite_tags_extraction(message.text)
-            self.multiple_films_with_one_name_check()
-        elif self.regime == 'description':
-            self.tags = self.description_tags_extraction(message.text)
-            self.answer()
-        else:
-            raise ValueError(f'Something wrong with Talker.regime value in Talker.message_processing method. Value: {regime}')
+            self.__multiple_films_with_one_name_handler()
+    
+    def __tags_injection(self, movie_id: str) -> None:
+        movie = self.movie_collection.search_by_id(movie_id)
+        self.tags.update(movie.get_tags())
+        self.search_id_set.extend(movie.get_id(return_list = True))
+    
+    def add_tags_in_multiple_movies_with_same_name_situation(self, movie_id: str) -> None:
+        self.__tags_injection(movie_id)
+        self.__multiple_films_with_one_name_check()
         
     
+    def message_processing(self, message: telebot.types.Message) -> None:
+        self.tags = self.__favorite_tags_extraction(message.text)
+        self.__multiple_films_with_one_name_check()
+        
     def answer(self):
         if self.testing: print(f'Search tags: {self.tags}')
-        subset = self.__subset_of_movies_based_on_tags(self.tags)
-        if self.regime == 'favorite':
+        subset = self.subset_of_movies_based_on_tags(self.tags)
+        if subset:
             subset = subset.removed_by_id(self.search_id_set)
             if self.testing:print('search_id_set:', self.search_id_set)
             self.search_id_set.clear()
+            self.print_answer(subset)
+
+
+class DescriptionRegime(Talker):
+    
+    def __init__(self, movie_collection: MovieCollection, testing: bool, telebot: telebot.TeleBot, chat_id) -> None:
+        self.movie_collection = movie_collection
+        self.testing = testing
+        self.telebot = telebot
+        self.chat_id = chat_id
         
-        if subset:
-            head_of_subset = self.__head_of_sorted_subset_of_movies(subset, 5)
-            self.send_message(str(head_of_subset))
-        else:
-            self.send_message("No such movies in base")
+        
+    def message_processing(self, message: telebot.types.Message) -> None:
+        self.tags = self.description_tags_extraction(message.text)
+        self.answer()
+    
+    def answer(self):
+        if self.testing: print(f'Search tags: {self.tags}')
+        subset = self.subset_of_movies_based_on_tags(self.tags)
+        self.print_answer(subset)
              
 
