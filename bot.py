@@ -34,11 +34,13 @@ print('Data is read')
 full_collection = MovieCollection(df)
 print('Collection is created')
 regime_manager = RegimeManager(bot)
-
+bot_on = False
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
     regime_manager.beginning(message)
+    global bot_on
+    bot_on = True
     
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
@@ -55,11 +57,15 @@ def callback_worker(call):
 
 @bot.message_handler(content_types=['text']) 
 def get_text_messages(message):
-    start = time.time()
-    print(type(talker))
-    talker.message_processing(message)
-    print(type(talker))
-    talker.send_message(f'search time: {round(time.time() - start, 1)} s')
+    try:
+        start = time.time()
+        talker.message_processing(message)
+        talker.send_message(f'search time: {round(time.time() - start, 1)} s')
+    except NameError:
+        if bot_on:
+            bot.send_message(message.from_user.id, text="Please choose the mode of bot\'s work")
+        else:
+            bot.send_message(message.from_user.id, text='To run the bot send "\\start" command')
     
     
 print('ok')
