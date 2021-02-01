@@ -38,7 +38,6 @@ class TextProcessor:
                     and not token.is_punct
                     and not token.is_digit
                     and not token.tag_ in {'RB', 'RBR', 'RBS', 'JJS'}
-                    and token.text.lower() not in {'smth'}
                     }
 
             noun_chunks = {
