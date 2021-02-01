@@ -10,6 +10,14 @@ class TextProcessor:
     
     nlp = spacy.load('en_core_web_sm')
     
+    def __noun_chunks_filter(self, noun_chunks: set) -> set:
+        chuncks_to_go = set()
+        for chunk in noun_chunks:
+            chunk_new = re.sub(r'\b(a|the|an)\s+', '', chunk)
+            chunk_new = chunk_new.strip()
+            chuncks_to_go.add(chunk_new)
+        return chuncks_to_go
+    
     def description_tags_extraction(self, text: str) -> set:
         if type(text) == str:
             doc = self.nlp(text)
@@ -21,15 +29,18 @@ class TextProcessor:
                     and (not token.is_digit)
                     and token.text.lower() not in {'smth'}
                     }
+
             noun_chunks = {
                 token.text.lower()
                 for token in doc.noun_chunks
                     if token.text.lower() not in self.nlp.Defaults.stop_words
                     }
-            tags.update(noun_chunks)
+
+            tags.update(self.__noun_chunks_filter(noun_chunks))
         else:
             tags = set()
         return tags
+    
     
     def movie_title_processing(self, text: str) -> str:
         text = re.sub(r'\s+', ' ', text.lower().strip())
@@ -116,7 +127,8 @@ class MovieCollection(TextProcessor):
                 self.__tags_similarity_score_for_movie, 
                 args = (search_tags,)
                 )
-        self.df['general_score'] = self.df['tag_similarity_score'] * self.df['avg_vote']*0.01
+        weight_sim_score = 0.95
+        self.df['general_score'] = (weight_sim_score*self.df['tag_similarity_score']) + (self.df['avg_vote']*0.1*(1-weight_sim_score))
          
     def sort(self, by: str, asc: bool):
         self.df.sort_values(by = by, axis = 0, inplace= True, ascending = asc)
