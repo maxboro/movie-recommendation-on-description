@@ -13,8 +13,5 @@ would be found in data, union of their tags would be used fo search. In case if 
 user would be offered to choose from them with more film data provided.
 
 Data is extract from this dataset: https://www.kaggle.com/stefanoleone992/imdb-extensive-dataset
-<<<<<<< HEAD
-=======
 
 
->>>>>>> a1655bd95803b86ac70d93b6daa265725ef6b57f
