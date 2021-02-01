@@ -13,9 +13,19 @@ class TextProcessor:
     def __noun_chunks_filter(self, noun_chunks: set) -> set:
         chuncks_to_go = set()
         for chunk in noun_chunks:
-            chunk_new = re.sub(r'\b(a|the|an)\s+', '', chunk)
+            chunk_new = re.sub(r'\b(a|the|an|his|her|this|that|some)\s+', '', chunk)
+            chunk_new = re.sub(r'(\b\'|\'\b)', '', chunk_new)
+            chunk_new = re.sub(r'(\(|\"|\))', '', chunk_new)
             chunk_new = chunk_new.strip()
             chuncks_to_go.add(chunk_new)
+        chuncks_to_go = set(
+                filter(
+                lambda string: 
+                    len(string.split(' ')) < 4 
+                    and len(string.split(' ')) > 1, 
+                chuncks_to_go
+                    )
+                )
         return chuncks_to_go
     
     def description_tags_extraction(self, text: str) -> set:
@@ -24,9 +34,10 @@ class TextProcessor:
             tags = {
                 token.lemma_ 
                 for token in doc 
-                if (token.text.lower() not in self.nlp.Defaults.stop_words) 
-                    and (not token.is_punct)
-                    and (not token.is_digit)
+                if token.text.lower() not in self.nlp.Defaults.stop_words 
+                    and not token.is_punct
+                    and not token.is_digit
+                    and not token.tag_ in {'RB', 'RBR', 'RBS', 'JJS'}
                     and token.text.lower() not in {'smth'}
                     }
 
@@ -35,7 +46,7 @@ class TextProcessor:
                 for token in doc.noun_chunks
                     if token.text.lower() not in self.nlp.Defaults.stop_words
                     }
-
+            if tags: print(tags)
             tags.update(self.__noun_chunks_filter(noun_chunks))
         else:
             tags = set()
