@@ -66,11 +66,11 @@ def get_text_messages(message):
             bot.send_message(message.from_user.id, text="Please choose the mode of bot\'s work")
         else:
             bot.send_message(message.from_user.id, text='To run the bot send "\\start" command')
-    
+
     
 print('ok')
 
-#bot.infinity_polling()
+bot.infinity_polling()
         
-bot.polling(none_stop=True, interval=0)
+#bot.polling(none_stop=True, interval=0)
     

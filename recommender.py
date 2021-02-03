@@ -10,7 +10,8 @@ class TextProcessor:
     
     nlp = spacy.load('en_core_web_sm')
     
-    def __noun_chunks_filter(self, noun_chunks: set) -> set:
+    @staticmethod
+    def __noun_chunks_filter(noun_chunks: set) -> set:
         chuncks_to_go = set()
         for chunk in noun_chunks:
             chunk_new = re.sub(r'\b(a|the|an|his|her|this|that|some)\s+', '', chunk)
@@ -45,14 +46,13 @@ class TextProcessor:
                 for token in doc.noun_chunks
                     if token.text.lower() not in self.nlp.Defaults.stop_words
                     }
-            if tags: print(tags)
             tags.update(self.__noun_chunks_filter(noun_chunks))
         else:
             tags = set()
         return tags
     
-    
-    def movie_title_processing(self, text: str) -> str:
+    @staticmethod
+    def movie_title_processing(text: str) -> str:
         text = re.sub(r'\s+', ' ', text.lower().strip())
         return text
     
@@ -60,6 +60,8 @@ class TextProcessor:
 
     
 class MovieCollection(TextProcessor):
+    
+    weight_sim_score = 0.95
     
     def __init__(self, data: pd.DataFrame = None) -> None:
         if type(data) == pd.DataFrame:
@@ -91,13 +93,24 @@ class MovieCollection(TextProcessor):
     def __len__(self) -> int:
         return len(self.df)
     
-    def __tags_similarity_score_for_movie(self, search_tags: set, movie_tags: set) -> float:
+    @staticmethod
+    def __tags_similarity_score_for_movie(search_tags: set, movie_tags: set) -> float:
         intersect_len = len(movie_tags.intersection(search_tags))
         search_len = len(search_tags)
         if search_len > 0:
             return intersect_len / search_len
         else:
             return 0
+    
+    def __general_score(self, line: list) -> float:
+        avg_vote = line[0]
+        sim_score = line[1]
+        if sim_score == 0:
+            return 0
+        else:
+            return (self.weight_sim_score*sim_score) + (avg_vote*0.1*(1 - self.weight_sim_score))
+        
+        
     
     def get_id(self, return_list: bool = False) -> (list, str):
         if len(self) > 1 or return_list:
@@ -131,14 +144,12 @@ class MovieCollection(TextProcessor):
         else:
             raise TypeError(f'Movie id only str or list, got {type(movie_id)}')
     
-    
     def tags_similarity_score_collection(self, search_tags):
         self.df['tag_similarity_score'] = self.df['tags'].apply(
                 self.__tags_similarity_score_for_movie, 
                 args = (search_tags,)
                 )
-        weight_sim_score = 0.95
-        self.df['general_score'] = (weight_sim_score*self.df['tag_similarity_score']) + (self.df['avg_vote']*0.1*(1-weight_sim_score))
+        self.df['general_score'] = self.df[['avg_vote', 'tag_similarity_score']].apply(self.__general_score, axis = 1)
          
     def sort(self, by: str, asc: bool):
         self.df.sort_values(by = by, axis = 0, inplace= True, ascending = asc)
@@ -159,7 +170,8 @@ class Talker(TextProcessor):
         else:
             return None
     
-    def __head_of_sorted_subset_of_movies(self, subset: MovieCollection, num_of_values: int) -> MovieCollection:
+    @staticmethod
+    def __head_of_sorted_subset_of_movies(subset: MovieCollection, num_of_values: int) -> MovieCollection:
         if type(subset) == MovieCollection and type(num_of_values) == int:
             subset.sort(by = 'general_score', asc = False)
             return subset[:num_of_values]
@@ -196,12 +208,13 @@ class RegimeManager(Talker):
     def returnBot(self, call, movie_collection, testing, telebot) -> None:
         if call.data == "favorite":
             self.send_message('Write a few of your favourite films, separated by semicolumn')
-            return FavoriteRegime(movie_collection, testing, telebot, self.chat_id)
+            Regime = FavoriteRegime
         elif call.data == "description":
             self.send_message('Write film themes you are interested in')
-            return DescriptionRegime(movie_collection, testing, telebot, self.chat_id)
+            Regime = DescriptionRegime
         else:
             raise Exception("Button error")
+        return Regime(movie_collection, testing, telebot, self.chat_id)
             
 
 class FavoriteRegime(Talker):
@@ -211,8 +224,8 @@ class FavoriteRegime(Talker):
         self.testing = testing
         self.telebot = telebot
         self.chat_id = chat_id
-        self.clarification_set = []
-        self.search_id_set = []
+        self.__clarification_set = []
+        self.__search_id_set = []
     
     
     def __favorite_tags_extraction(self, movie_names: str) -> set:
@@ -222,9 +235,9 @@ class FavoriteRegime(Talker):
             movies_with_this_title = self.movie_collection.search_by_title(name)
             if len(movies_with_this_title) == 1:
                 search_tags.update(movies_with_this_title.get_tags())
-                self.search_id_set.extend(movies_with_this_title.get_id(return_list = True))
+                self.__search_id_set.extend(movies_with_this_title.get_id(return_list = True))
             elif len(movies_with_this_title) > 1:
-                self.clarification_set.append(movies_with_this_title)
+                self.__clarification_set.append(movies_with_this_title)
             else:
                 self.send_message(f"No movies named '{name.strip()}' in base")
             
@@ -233,17 +246,17 @@ class FavoriteRegime(Talker):
     
     def __multiple_films_with_one_name_handler(self):
         keyboard_mov = telebot.types.InlineKeyboardMarkup()
-        for movie in self.clarification_set[0]:
+        for movie in self.__clarification_set[0]:
             keyboard_mov.add(telebot.types.InlineKeyboardButton(text=f'{str(movie)}', 
                                                     callback_data=f'{movie["imdb_title_id"]}'))
-        self.clarification_set.pop(0)
+        self.__clarification_set.pop(0)
         self.send_message(f"Multiple movies named '{movie['original_title']}' are in base",
                                   "Please choose what movie exactly you are talking about")
         self.telebot.send_message(self.chat_id, text="Variants:", 
                                           reply_markup=keyboard_mov)
     
     def __multiple_films_with_one_name_check(self):
-        if not self.clarification_set:
+        if not self.__clarification_set:
             self.answer()
         else:
             self.__multiple_films_with_one_name_handler()
@@ -251,7 +264,7 @@ class FavoriteRegime(Talker):
     def __tags_injection(self, movie_id: str) -> None:
         movie = self.movie_collection.search_by_id(movie_id)
         self.tags.update(movie.get_tags())
-        self.search_id_set.extend(movie.get_id(return_list = True))
+        self.__search_id_set.extend(movie.get_id(return_list = True))
     
     def add_tags_in_multiple_movies_with_same_name_situation(self, movie_id: str) -> None:
         self.__tags_injection(movie_id)
@@ -266,9 +279,9 @@ class FavoriteRegime(Talker):
         if self.testing: print(f'Search tags: {self.tags}')
         subset = self.subset_of_movies_based_on_tags(self.tags)
         if subset:
-            subset = subset.removed_by_id(self.search_id_set)
-            if self.testing:print('search_id_set:', self.search_id_set)
-            self.search_id_set.clear()
+            subset = subset.removed_by_id(self.__search_id_set)
+            if self.testing:print('search_id_set:', self.__search_id_set)
+            self.__search_id_set.clear()
             self.print_answer(subset)
 
 
