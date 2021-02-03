@@ -57,8 +57,6 @@ class TextProcessor:
         return text
     
   
-
-    
 class MovieCollection(TextProcessor):
     
     weight_sim_score = 0.95
@@ -110,8 +108,6 @@ class MovieCollection(TextProcessor):
         else:
             return (self.weight_sim_score*sim_score) + (avg_vote*0.1*(1 - self.weight_sim_score))
         
-        
-    
     def get_id(self, return_list: bool = False) -> (list, str):
         if len(self) > 1 or return_list:
             return self.df['imdb_title_id'].to_list()
@@ -227,7 +223,6 @@ class FavoriteRegime(Talker):
         self.__clarification_set = []
         self.__search_id_set = []
     
-    
     def __favorite_tags_extraction(self, movie_names: str) -> set:
         search_tags = set()
         names = {name for name in movie_names.split(';')}
@@ -243,7 +238,6 @@ class FavoriteRegime(Talker):
             
         return search_tags
          
-    
     def __multiple_films_with_one_name_handler(self):
         keyboard_mov = telebot.types.InlineKeyboardMarkup()
         for movie in self.__clarification_set[0]:
@@ -270,7 +264,6 @@ class FavoriteRegime(Talker):
         self.__tags_injection(movie_id)
         self.__multiple_films_with_one_name_check()
         
-    
     def message_processing(self, message: telebot.types.Message) -> None:
         self.tags = self.__favorite_tags_extraction(message.text)
         self.__multiple_films_with_one_name_check()
@@ -292,8 +285,7 @@ class DescriptionRegime(Talker):
         self.testing = testing
         self.telebot = telebot
         self.chat_id = chat_id
-        
-        
+         
     def message_processing(self, message: telebot.types.Message) -> None:
         self.tags = self.description_tags_extraction(message.text)
         self.answer()
