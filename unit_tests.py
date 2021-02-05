@@ -20,15 +20,18 @@ class Tests(unittest.TestCase):
                         }
                     ).head(5)
         self.collection_test = MovieCollection(self.df_test)
-        self.talker = Talker(movie_collection = self.collection_test, testing = False)
+        self.desc_talker = DescriptionRegime(movie_collection = self.collection_test, testing = False, telebot = '', chat_id = '1')
 
     
-    def test_mixin_description_tags_extraction(self):
-        self.assertIn('cat', MixIn().description_tags_extraction('cats 08 reporters  '))
-        self.assertIn('reporter', MixIn().description_tags_extraction('cats 64 reporters'))
-        self.assertIn('woman', MixIn().description_tags_extraction('women'))
-        self.assertNotIn('.', MixIn().description_tags_extraction('cats .dogs, reporters'))
-        self.assertNotIn(',', MixIn().description_tags_extraction('cats .dogs, reporters'))
+    def test_text_proc_description_tags_extraction(self):
+        self.assertIn('cat', TextProcessor().description_tags_extraction('cats 08 reporters  '))
+        self.assertIn('reporter', TextProcessor().description_tags_extraction('cats 64 reporters'))
+        self.assertIn('woman', TextProcessor().description_tags_extraction('women'))
+        self.assertNotIn('.', TextProcessor().description_tags_extraction('cats .dogs, reporters'))
+        self.assertNotIn(',', TextProcessor().description_tags_extraction('cats .dogs, reporters'))
+    
+    def test_text_proc_noun_chunks_filter(self):
+        self.assertEqual(TextProcessor._TextProcessor__noun_chunks_filter({"his 'wife'", 'dog', 'as-salamu alaykum'}), {'as-salamu alaykum'})
     
     
     def test_mc_len__testing(self):
@@ -58,9 +61,9 @@ class Tests(unittest.TestCase):
             )
     
     def test_talker_subset_of_movies_based_on_tags(self):
-        self.assertEqual(self.talker.subset_of_movies_based_on_tags(tags = set()), None)
-        self.assertEqual(len(self.talker.subset_of_movies_based_on_tags(tags = {'reporter'})), 1)
-        self.assertEqual(len(self.talker.subset_of_movies_based_on_tags(tags = {'true story'})), 1)
+        self.assertEqual(self.desc_talker.subset_of_movies_based_on_tags(tags = set()), None)
+        self.assertEqual(len(self.desc_talker.subset_of_movies_based_on_tags(tags = {'reporter'})), 1)
+        self.assertEqual(len(self.desc_talker.subset_of_movies_based_on_tags(tags = {'true story'})), 1)
     
     
 unittest.main()
